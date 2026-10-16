@@ -9,6 +9,7 @@ yarn.lock
 
 # logs and diagnostics
 *.log
+*.tmp
 npm-debug.log*
 
 # editors and OS

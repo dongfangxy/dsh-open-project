@@ -108,15 +108,23 @@ window.__ModuleLoader__.load({
 
     /** 通用设置里的这一行。 */
     function OpenProjectRow() {
-      const [state, setState] = React.useState({ phase: 'loading', enabled: false, error: '' })
+      const [state, setState] = React.useState({ phase: 'loading', enabled: false, supported: true, error: '' })
 
       React.useEffect(() => {
         const controller = new AbortController()
         fetchState(controller.signal)
-          .then((payload) => { setState({ phase: 'ready', enabled: payload.enabled === true, error: '' }) })
+          .then((payload) => {
+            // supported=false 表示宿主不是 Windows：这一行不渲染（见下方 return null）。
+            setState({
+              phase: 'ready',
+              enabled: payload.enabled === true,
+              supported: payload.supported !== false,
+              error: ''
+            })
+          })
           .catch((error) => {
             if (controller.signal.aborted) return
-            setState({ phase: 'ready', enabled: false, error: String(error?.message ?? error) })
+            setState({ phase: 'ready', enabled: false, supported: true, error: String(error?.message ?? error) })
           })
         return () => { controller.abort() }
       }, [])
@@ -124,14 +132,26 @@ window.__ModuleLoader__.load({
       const apply = React.useCallback((next) => {
         setState((current) => ({ ...current, phase: 'saving', enabled: next, error: '' }))
         putState(next)
-          .then(() => { setState({ phase: 'ready', enabled: next, error: '' }) })
+          .then(() => { setState((current) => ({ ...current, phase: 'ready', enabled: next, error: '' })) })
           .catch((error) => {
             // 失败时回读真实状态，避免界面显示成"已生效"。
             fetchState()
-              .then((payload) => { setState({ phase: 'ready', enabled: payload.enabled === true, error: String(error?.message ?? error) }) })
+              .then((payload) => {
+                setState((current) => ({
+                  ...current,
+                  phase: 'ready',
+                  enabled: payload.enabled === true,
+                  supported: payload.supported !== false,
+                  error: String(error?.message ?? error)
+                }))
+              })
               .catch(() => { setState((current) => ({ ...current, phase: 'ready', error: String(error?.message ?? error) })) })
           })
       }, [])
+
+      // 宿主不是 Windows 时不渲染这一行：整个功能没有意义，留一个必然失败的
+      // 开关只会误导人。loading 阶段也先不渲染，避免闪一下再消失。
+      if (state.phase === 'loading' || state.supported === false) return null
 
       return h('div', { className: 'dop-row' },
         h('div', null,
