@@ -1,0 +1,54 @@
+{
+  "name": "dsh-open-project",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Adds an Explorer folder context-menu entry that registers the folder as a DSH project, plus a switch for it in DSH general settings.",
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "plugin",
+    "windows",
+    "explorer",
+    "context-menu",
+    "workspace",
+    "project"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dongfangxy/dsh-open-project.git"
+  },
+  "homepage": "https://github.com/dongfangxy/dsh-open-project#readme",
+  "bugs": {
+    "url": "https://github.com/dongfangxy/dsh-open-project/issues"
+  },
+  "main": "./lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "cli",
+    "client.js",
+    "cordis.patch.yml",
+    "README.md",
+    "README.zh.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "dsh": {
+    "manifestVersion": 1,
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true
+    }
+  }
+}

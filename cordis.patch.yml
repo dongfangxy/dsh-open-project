@@ -1,0 +1,18 @@
+# dsh-open-project — Host half.
+#
+# Inserts exactly one Host plugin. Everything else the feature needs — the HTTP
+# server it registers its routes on, and the workspace registry that owns
+# project records — is read from the running composition through the plugin's
+# `inject` list, so this file stays a single row.
+#
+# The row id matches the package name. The Client half carries the same id, and
+# the client-plugin convention keeps those three aligned (package name, Host row
+# id, Client module id).
+#
+# Removing this row (or disabling it in the profile patch) turns the feature off;
+# the Explorer menu entry is added and removed by the settings switch, which
+# calls cli/context-menu.ps1.
+
+- insert:
+    - id: dsh-open-project
+      name: 'dsh-open-project'
