@@ -81,8 +81,9 @@ If the settings row does not appear on its own, restart DSH.
 
 ## Use
 
-1. Open **Settings → General** in DSH and turn on 「在资源管理器中打开」. This writes the
-   registry entry; nothing else changes.
+1. Open **Settings → General** in DSH and turn the row on (「用 DeepSeek Harness 打开」 in a
+   Chinese browser, "Open in DeepSeek Harness" otherwise). This writes the registry entry;
+   nothing else changes.
 2. In Explorer, right-click a folder (or the empty area inside one) and choose
    **用 DeepSeek Harness 打开**.
 3. The folder becomes a project in DSH's sidebar. Open it there and start a session; DSH runs
@@ -173,10 +174,11 @@ deletes both keys recursively.
 - **The menu icon is best-effort.** The same lookup decides the icon. If it finds nothing, the
   entry is written without an icon (`Icon` is removed), and the menu still works.
 - **No screenshots** in this repository yet (see [Effect](#effect)).
-- **The settings row and the notifications are bilingual, the menu label is not.** The row
-  follows the browser language (Chinese, otherwise English); the folder-menu label is written by
-  `cli/context-menu.ps1` and defaults to Chinese — pass `-Title` for another language. The
-  settings switch does not pass a title.
+- **The settings row follows the browser language; the notifications and the menu label do
+  not.** The row picks Chinese when `navigator.language` starts with `zh`, English otherwise.
+  The success/failure notifications and dialogs come from `cli/open-project-in-dsh.ps1` and are
+  hard-coded English. The folder-menu label is written by `cli/context-menu.ps1`, defaults to
+  Chinese, and can be changed with `-Title`; the settings switch does not pass a title.
 - **Disabling the plugin does not remove the registry entry** — the switch is part of this
   plugin, so turn the switch off first (see [Uninstall](#uninstall)). Project records already in
   the sidebar are stored by DSH and stay after the plugin is disabled.
