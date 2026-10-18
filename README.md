@@ -34,10 +34,11 @@ current user's registry only; no administrator rights needed." The row sits betw
 code-workspace row and the version row. Its switch writes the registry entry when turned on and
 deletes it when turned off. On a non-Windows host the row is not rendered at all.
 
-**Screenshots: TODO.** This repository contains no screenshot, and this README deliberately
-shows none. Before publishing, capture the two states (`docs/explorer-menu.png` — the folder
-context menu with the entry; `docs/settings-row.png` — the General settings row) and reference
-them from here.
+**Screenshots.** Windows 11, DSH desktop 0.2.1-rc.2.
+
+![The folder context menu with the entry](assets/context-menu.png)
+
+![The switch in Settings → General](assets/settings-general.png)
 
 ## Requirements
 
@@ -173,7 +174,8 @@ deletes both keys recursively.
   the *starting* step is affected; registering works with any running instance.
 - **The menu icon is best-effort.** The same lookup decides the icon. If it finds nothing, the
   entry is written without an icon (`Icon` is removed), and the menu still works.
-- **No screenshots** in this repository yet (see [Effect](#effect)).
+- **The screenshots date from DSH desktop 0.2.1-rc.2** (see [Effect](#effect)); the row's exact
+  appearance follows the app's own settings list, so a future release may style it differently.
 - **The settings row follows the browser language; the notifications and the menu label do
   not.** The row picks Chinese when `navigator.language` starts with `zh`, English otherwise.
   The success/failure notifications and dialogs come from `cli/open-project-in-dsh.ps1` and are
@@ -234,6 +236,8 @@ cli/context-menu.ps1         Reads/writes the HKCU context-menu keys (enable|dis
 cli/app-path.ps1             Shared lookup for the DSH executable (override, running, defaults)
 cli/open-project-in-dsh.ps1  The menu action: find port, start app if needed, POST the path
 cli/open-project-in-dsh.vbs  Hidden-window launcher for the .ps1 (kept pure ASCII on purpose)
+screenshots.json             Storefront screenshot order (marketplace reads it from the repo)
+assets/                      The two screenshots this README shows
 ```
 
 **Host half vs client half.** `cordis.patch.yml` contributes exactly one host plugin row,

@@ -31,9 +31,11 @@ a DSH project. Writes the current user’s registry only; no administrator right
 的位置在原有的「显示代码工作视图」与版本号两行之间。开关打开就写入注册表项，关闭就删除。宿主不是
 Windows 时，这一行完全不渲染。
 
-**截图：TODO。** 本仓库目前没有任何截图，这份文档也刻意不放截图。发布前请补两张：
-`docs/explorer-menu.png`（文件夹右键菜单里的这一项）和 `docs/settings-row.png`（通用设置里的
-这一行），再在这里引用。
+**截图。** Windows 11，DSH 桌面版 0.2.1-rc.2。
+
+![文件夹右键菜单里的这一项](assets/context-menu.png)
+
+![设置 → 通用设置里的开关](assets/settings-general.png)
 
 ## 环境要求
 
@@ -151,7 +153,8 @@ HKCU\Software\Classes\Directory\Background\shell\OpenInDeepSeekHarness
   「启动」这一步；只要有一个实例在跑，登记就照常工作。
 - **菜单图标是尽力而为的。** 决定图标的是同一个查找。一个都找不到时不写图标（删掉 `Icon` 值），
   菜单照常可用。
-- **本仓库还没有截图**（见[效果](#效果)）。
+- **截图来自 DSH 桌面版 0.2.1-rc.2**（见[效果](#效果)）；这一行的具体样式跟随应用自己的设置列表，
+  以后版本可能变化。
 - **设置行跟随浏览器语言，通知和菜单标签不跟随。** 设置行按浏览器语言在中英之间切换；而成功
   通知、启动提示和失败对话框都由 `cli/open-project-in-dsh.ps1` 发出，文案固定为英文。文件夹菜单
   的标签由 `cli/context-menu.ps1` 写入，默认中文，用 `-Title` 可以换成别的语言；设置页的开关
@@ -201,6 +204,8 @@ cli/context-menu.ps1         读写 HKCU 右键菜单项（enable|disable|status
 cli/app-path.ps1             共享的应用可执行文件查找（环境变量覆盖 / 运行中实例 / 默认安装位置）
 cli/open-project-in-dsh.ps1  菜单动作：找端口、必要时启动应用、POST 路径
 cli/open-project-in-dsh.vbs  以隐藏窗口拉起上面那个 .ps1（刻意保持纯 ASCII）
+screenshots.json             市场截图顺序（市场从仓库读取这个文件）
+assets/                      本文档展示的两张截图
 ```
 
 **宿主半边与客户端半边。** `cordis.patch.yml` 只贡献一行宿主插件，其 id 与包名一致；宿主半边
