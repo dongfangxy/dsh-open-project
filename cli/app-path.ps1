@@ -1,4 +1,4 @@
-# ============================================================
+﻿# ============================================================
 #  app-path.ps1 — locate the DeepSeek Harness desktop executable.
 #
 #  Dot-source this from the other scripts:

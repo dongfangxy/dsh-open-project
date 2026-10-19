@@ -43,8 +43,12 @@ deletes it when turned off. On a non-Windows host the row is not rendered at all
 ## Requirements
 
 - **Windows 10/11.** The whole feature is an Explorer + `HKCU` registry mechanism.
-- **PowerShell 7** (`pwsh.exe` on `PATH`). Both the host route and the context-menu launcher
-  invoke `pwsh.exe`; Windows PowerShell 5.1 (`powershell.exe`) is not used.
+- **PowerShell — either version, nothing to install.** Windows PowerShell 5.1 ships with
+  Windows 10/11 and is enough on its own: the scripts avoid syntax that only 7 accepts, and they
+  are saved as UTF-8 with a BOM so 5.1 decodes their non-ASCII default title correctly. When
+  PowerShell 7 is installed the plugin uses it instead, because it starts roughly three times
+  faster. The visible difference is the success notification: 5.1 shows a real Windows toast
+  (it can project WinRT), while 7 falls back to a tray balloon.
 - **`wscript.exe`** (ships with Windows) — the menu command runs through it so no console
   window flashes.
 - **A DSH profile that composes this plugin** and provides the `webServer` and
@@ -95,10 +99,10 @@ If the settings row does not appear on its own, restart DSH.
 The registry toggle can also be driven directly:
 
 ```powershell
-pwsh -NoProfile -File cli/context-menu.ps1 -Action status            # human-readable report
-pwsh -NoProfile -File cli/context-menu.ps1 -Action status -Json      # one JSON line (what the host reads)
-pwsh -NoProfile -File cli/context-menu.ps1 -Action enable
-pwsh -NoProfile -File cli/context-menu.ps1 -Action disable
+powershell -NoProfile -ExecutionPolicy Bypass -File cli/context-menu.ps1 -Action status            # human-readable report
+powershell -NoProfile -ExecutionPolicy Bypass -File cli/context-menu.ps1 -Action status -Json      # one JSON line (what the host reads)
+powershell -NoProfile -ExecutionPolicy Bypass -File cli/context-menu.ps1 -Action enable
+powershell -NoProfile -ExecutionPolicy Bypass -File cli/context-menu.ps1 -Action disable
 ```
 
 `-Title 'Open in DeepSeek Harness'` sets another menu label. The settings switch does not pass
@@ -164,8 +168,8 @@ deletes both keys recursively.
 - **Windows only.** Other platforms have no Explorer context menu, no `HKCU`, and no
   `wscript.exe`. The host reports `supported: false` there, and the client row is not rendered
   at all — so nothing appears in Settings rather than a switch that cannot work.
-- **PowerShell 7 is a hard dependency** for both the menu action and the settings switch (see
-  [Requirements](#requirements)).
+- **PowerShell is started once per action**, so the menu click and each settings toggle pay a
+  process start-up (about 0.2 s with PowerShell 7, about 0.8 s with 5.1).
 - **Cold start needs the app executable to be discoverable.** `cli/app-path.ps1` checks
   `DSH_DESKTOP_APP_EXE`, then a running instance, then the default Electron install locations.
   A portable or unusually placed installation is found only while DSH is running; when it is
@@ -188,7 +192,7 @@ deletes both keys recursively.
 ## Permissions and security
 
 - **Registry: `HKCU` only.** No administrator rights are needed, and nothing outside the two
-  keys above is read or written. `pwsh -NoProfile -File cli/context-menu.ps1 -Action disable`
+  keys above is read or written. `powershell -NoProfile -ExecutionPolicy Bypass -File cli/context-menu.ps1 -Action disable`
   removes them completely.
 - **The routes live on DSH's own local web server**, which listens on loopback
   (`127.0.0.1`) — verified on this machine as `127.0.0.1:19387`. The plugin adds two exact
@@ -213,7 +217,7 @@ deletes both keys recursively.
 ## Uninstall
 
 1. In DSH, turn off the settings switch — or run
-   `pwsh -NoProfile -File cli/context-menu.ps1 -Action disable`. Either one deletes both
+   `powershell -NoProfile -ExecutionPolicy Bypass -File cli/context-menu.ps1 -Action disable`. Either one deletes both
    registry keys.
 2. Remove the plugin: the sidebar **Plugins** page → uninstall, or
    `dsh plugin --profile <profile> remove dsh-open-project`.

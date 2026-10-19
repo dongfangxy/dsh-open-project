@@ -1,4 +1,4 @@
-# ============================================================
+﻿# ============================================================
 #  open-project-in-dsh.ps1 — the action behind the Explorer context-menu entry.
 #
 #  It does four things:
@@ -15,8 +15,9 @@
 [CmdletBinding()]
 param(
   [Parameter(Mandatory = $true, Position = 0)][string]$Path,
-  # Show a dialog on failure. Turn off for scripted use.
-  [bool]$ShowErrors = $true
+  # Suppress failure dialogs. Use for scripted or unattended runs; a switch rather
+  # than a boolean so `-File` invocation does not have to parse "true"/"false".
+  [switch]$Silent
 )
 
 $ErrorActionPreference = 'Stop'
@@ -39,6 +40,9 @@ function Show-Balloon {
 
 function Show-Toast {
   param([string]$Line1, [string]$Line2)
+  # Windows PowerShell 5.1 can project WinRT, so it shows a real toast.
+  # PowerShell 7 on .NET cannot project WinRT at all, so fall back to a tray
+  # balloon rather than losing the feedback silently.
   try {
     [Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] > $null
     $template = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02)
@@ -47,6 +51,19 @@ function Show-Toast {
     $nodes.Item(1).AppendChild($template.CreateTextNode($Line2)) > $null
     $toast = [Windows.UI.Notifications.ToastNotification]::new($template)
     [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('DeepSeek Harness').Show($toast)
+    return
+  } catch { }
+  try {
+    Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
+    Add-Type -AssemblyName System.Drawing -ErrorAction Stop
+    $balloon = New-Object System.Windows.Forms.NotifyIcon
+    $balloon.Icon = [System.Drawing.SystemIcons]::Information
+    $balloon.Visible = $true
+    $balloon.ShowBalloonTip(4000, $Line1, $Line2, [System.Windows.Forms.ToolTipIcon]::Info)
+    # Keep the process alive while the balloon is up; this window is hidden.
+    Start-Sleep -Milliseconds 4500
+    $balloon.Visible = $false
+    $balloon.Dispose()
   } catch { }
 }
 
@@ -75,11 +92,11 @@ function Get-DshBaseUrl {
 try {
   $resolved = (Resolve-Path -LiteralPath $Path -ErrorAction Stop).ProviderPath
 } catch {
-  if ($ShowErrors) { Show-Balloon "Folder does not exist:`n$Path" 'Warning' }
+  if (-not $Silent) { Show-Balloon "Folder does not exist:`n$Path" 'Warning' }
   exit 2
 }
 if (-not (Test-Path -LiteralPath $resolved -PathType Container)) {
-  if ($ShowErrors) { Show-Balloon "Not a folder:`n$resolved" 'Warning' }
+  if (-not $Silent) { Show-Balloon "Not a folder:`n$resolved" 'Warning' }
   exit 2
 }
 
@@ -88,7 +105,7 @@ $coldStart = -not (Test-DshRunning)
 if ($coldStart) {
   $appExe = Find-DshAppExecutable
   if ($null -eq $appExe) {
-    if ($ShowErrors) {
+    if (-not $Silent) {
       Show-Balloon ("DeepSeek Harness is not running and its executable was not found.`n`n" +
         "Set DSH_DESKTOP_APP_EXE to the full path of 'DeepSeek Harness.exe', then retry.") 'Warning'
     }
@@ -125,7 +142,7 @@ while ((Get-Date) -lt $deadline) {
 }
 
 if ($null -eq $response) {
-  if ($ShowErrors) {
+  if (-not $Silent) {
     Show-Balloon (
       "Could not open this project.`n`nFolder: $resolved`nEndpoint: $base`nReason: $lastDetail`n`n" +
       'If the app just started, wait for its window and try again.') 'Warning'
@@ -134,7 +151,7 @@ if ($null -eq $response) {
 }
 
 if ($response.ok -ne $true) {
-  if ($ShowErrors) { Show-Balloon "DSH refused the registration:`n$($response.error)" 'Warning' }
+  if (-not $Silent) { Show-Balloon "DSH refused the registration:`n$($response.error)" 'Warning' }
   exit 1
 }
 

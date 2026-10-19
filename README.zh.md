@@ -40,8 +40,10 @@ Windows 时，这一行完全不渲染。
 ## 环境要求
 
 - **Windows 10/11。** 整个功能就是资源管理器加 `HKCU` 注册表这一套机制。
-- **PowerShell 7**（`pwsh.exe` 在 `PATH` 里）。宿主路由和右键菜单启动脚本调用的都是
-  `pwsh.exe`，不用 Windows 自带的 Windows PowerShell 5.1（`powershell.exe`）。
+- **PowerShell——两个版本都行，不用装任何东西。** Windows 10/11 自带的 Windows PowerShell 5.1
+  就够用：脚本刻意避开了只有 7 才接受的语法，并保存为带 BOM 的 UTF-8，好让 5.1 正确解码其中
+  非 ASCII 的默认标题。装了 PowerShell 7 时优先用 7，因为启动大约快三倍。用户能看到的差别只有
+  成功通知：5.1 能投影 WinRT，弹的是真正的 Windows 通知；7 则回退成托盘气泡。
 - **`wscript.exe`**（Windows 自带）——菜单命令经它拉起，这样不会闪控制台窗口。
 - **一个组合了本插件的 DSH profile**，并且提供 `webServer` 与 `workspaceRegistry` 两个服务——
   也就是 DSH 桌面版自己用的那两个（侧边栏的项目列表就建立在工作区注册表上）。缺任何一个，
@@ -83,10 +85,10 @@ dsh plugin --profile <profile> add github:dongfangxy/dsh-open-project
 也可以直接用脚本切换：
 
 ```powershell
-pwsh -NoProfile -File cli/context-menu.ps1 -Action status            # 人类可读的状态报告
-pwsh -NoProfile -File cli/context-menu.ps1 -Action status -Json      # 一行 JSON（宿主读的就是它）
-pwsh -NoProfile -File cli/context-menu.ps1 -Action enable
-pwsh -NoProfile -File cli/context-menu.ps1 -Action disable
+powershell -NoProfile -ExecutionPolicy Bypass -File cli/context-menu.ps1 -Action status            # 人类可读的状态报告
+powershell -NoProfile -ExecutionPolicy Bypass -File cli/context-menu.ps1 -Action status -Json      # 一行 JSON（宿主读的就是它）
+powershell -NoProfile -ExecutionPolicy Bypass -File cli/context-menu.ps1 -Action enable
+powershell -NoProfile -ExecutionPolicy Bypass -File cli/context-menu.ps1 -Action disable
 ```
 
 `-Title 'Open in DeepSeek Harness'` 可以换一个菜单标签。设置页的开关不传标题，所以它写进去的
@@ -121,7 +123,7 @@ pwsh -NoProfile -File cli/context-menu.ps1 -Action disable
 `GET /.dsh-open-project/menu` 读当前状态，用 `POST /.dsh-open-project/menu` 加
 `{"enabled": true|false}` 改状态。宿主路由对读请求执行
 `cli/context-menu.ps1 -Action status -Json`，对写请求执行 `-Action enable|disable`；宿主不是
-Windows 时则直接回答 `supported: false`，连 `pwsh` 都不运行。客户端据此完全不渲染这一行。
+Windows 时则直接回答 `supported: false`，连 PowerShell 都不运行。客户端据此完全不渲染这一行。
 写失败时，设置行会回读真实状态，而不是显示成已经改好了。
 
 **注册表项。** `cli/context-menu.ps1` 只写两个键：
@@ -145,7 +147,8 @@ HKCU\Software\Classes\Directory\Background\shell\OpenInDeepSeekHarness
 - **仅限 Windows。** 其他平台没有资源管理器右键菜单、没有 `HKCU`、也没有 `wscript.exe`。
   宿主在那里返回 `supported: false`，客户端那一行完全不渲染——所以设置里不会冒出一个注定
   用不了的开关。
-- **硬依赖 PowerShell 7**，右键菜单动作和设置开关都要用（见[环境要求](#环境要求)）。
+- **每个动作都要启动一次 PowerShell**，所以点菜单和每次拨动设置开关都要付一次进程启动开销
+  （PowerShell 7 约 0.2 秒，5.1 约 0.8 秒）。
 - **冷启动要求能找到应用可执行文件。** `cli/app-path.ps1` 依次查 `DSH_DESKTOP_APP_EXE`、正在
   运行的实例、默认的 Electron 安装位置。便携版或装在非常规位置的版本，只有在 DSH 正在运行时
   才会被找到；它没在运行时，请把 `DSH_DESKTOP_APP_EXE` 设成 `DeepSeek Harness.exe` 的完整路径
@@ -165,7 +168,7 @@ HKCU\Software\Classes\Directory\Background\shell\OpenInDeepSeekHarness
 ## 权限与安全
 
 - **注册表只写 `HKCU`。** 不需要管理员权限，也不读写上面那两个键之外的任何位置。
-  `pwsh -NoProfile -File cli/context-menu.ps1 -Action disable` 可以把它完全抹掉。
+  `powershell -NoProfile -ExecutionPolicy Bypass -File cli/context-menu.ps1 -Action disable` 可以把它完全抹掉。
 - **两条路由挂在 DSH 自己的本地 web 服务上**，该服务只监听回环地址（`127.0.0.1`）——
   本机实测是 `127.0.0.1:19387`。插件只新增两条精确路径，它自己不启动服务、不开端口。
 - **`POST /.dsh-open-project`** 要求自定义请求头 `x-dsh-open-project`（缺了返回 403），
@@ -177,13 +180,13 @@ HKCU\Software\Classes\Directory\Background\shell\OpenInDeepSeekHarness
   都会被拒绝，且不会创建任何项目。整个过程不经过 shell，请求里的内容也不会被拼进命令行。
 - **`GET/POST /.dsh-open-project/menu`** 同样没有自由输入：写请求必须是布尔值，且只会选中
   `cli/context-menu.ps1` 里两个固定动作之一；宿主不是 Windows 时它直接回 `supported: false`，
-  连 `pwsh` 都不运行。这条路由由 DSH 设置页自己调用，因此不要求自定义请求头。
+  连 PowerShell 都不运行。这条路由由 DSH 设置页自己调用，因此不要求自定义请求头。
 - **除了 `127.0.0.1` 不访问网络。** 插件不下载任何东西，也不执行任何从 HTTP 传进来的内容。
 
 ## 卸载
 
 1. 在 DSH 里关掉那个设置开关——或执行
-   `pwsh -NoProfile -File cli/context-menu.ps1 -Action disable`。两者都会删掉两个注册表键。
+   `powershell -NoProfile -ExecutionPolicy Bypass -File cli/context-menu.ps1 -Action disable`。两者都会删掉两个注册表键。
 2. 卸载插件：侧边栏 **Plugins** 页 → 卸载，或
    `dsh plugin --profile <profile> remove dsh-open-project`。
 

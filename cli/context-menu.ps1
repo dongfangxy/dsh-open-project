@@ -1,14 +1,15 @@
-# ============================================================
+﻿# ============================================================
 #  context-menu.ps1 — add or remove the Explorer folder context-menu entry
 #  "Open in DeepSeek Harness" (用 DeepSeek Harness 打开).
 #
 #  Writes to HKCU only: no administrator rights, and fully reversible.
 #
-#  Usage:
-#    pwsh -NoProfile -File context-menu.ps1 -Action enable
-#    pwsh -NoProfile -File context-menu.ps1 -Action disable
-#    pwsh -NoProfile -File context-menu.ps1 -Action status
-#    pwsh -NoProfile -File context-menu.ps1 -Action status -Json   # host plugin reads this
+#  Usage (either interpreter; Windows PowerShell 5.1 ships with Windows,
+#  PowerShell 7 starts faster when installed):
+#    powershell -NoProfile -ExecutionPolicy Bypass -File context-menu.ps1 -Action enable
+#    powershell -NoProfile -ExecutionPolicy Bypass -File context-menu.ps1 -Action disable
+#    powershell -NoProfile -ExecutionPolicy Bypass -File context-menu.ps1 -Action status
+#    powershell -NoProfile -ExecutionPolicy Bypass -File context-menu.ps1 -Action status -Json
 # ============================================================
 
 [CmdletBinding()]
@@ -38,7 +39,7 @@ $keys = @(
 )
 
 # Command: wscript runs the VBS hidden; %V is the clicked folder (quoted, so
-# paths with spaces are safe). Calling pwsh directly would flash a console.
+# paths with spaces are safe). Calling PowerShell directly would flash a console.
 $commandValue = 'wscript.exe //nologo "{0}" "%V"' -f $vbs
 
 function Get-Status {
