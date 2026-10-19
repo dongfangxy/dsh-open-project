@@ -24,8 +24,9 @@
 "把窗口带到前面"是故意做的一步：登记项目本身不会改变屏幕上的任何东西，少了这一步，用户点了会觉得
 "什么都没发生"。
 
-DSH 没在运行时，它会先把应用启动起来，等它就绪后再登记（冷启动有一条需要注意的限制，
-见[限制](#限制)）。
+DSH 没在运行时，它会先把应用启动起来：定位可执行文件（依次是 `DSH_DESKTOP_APP_EXE`、正在运行的
+实例、安装程序注册的 `dsh://` 协议处理命令、默认安装位置），拉起应用，等窗口出现并把它带到前面，
+然后在宿主就绪后登记该文件夹。整个等待过程有上限（180 秒）。
 
 **DSH 里。** 设置 → 通用会多出一行。中文浏览器下它是「用 DeepSeek Harness 打开」，说明文字是
 「在文件夹的右键菜单里增加「用 DeepSeek Harness 打开」，点击后把该文件夹登记为 DSH 项目。只写
@@ -154,9 +155,8 @@ HKCU\Software\Classes\Directory\Background\shell\OpenInDeepSeekHarness
 - **每个动作都要启动一次 PowerShell**，所以点菜单和每次拨动设置开关都要付一次进程启动开销
   （PowerShell 7 约 0.2 秒，5.1 约 0.8 秒）。
 - **冷启动要求能找到应用可执行文件。** `cli/app-path.ps1` 依次查 `DSH_DESKTOP_APP_EXE`、正在
-  运行的实例、默认的 Electron 安装位置。便携版或装在非常规位置的版本，只有在 DSH 正在运行时
-  才会被找到；它没在运行时，请把 `DSH_DESKTOP_APP_EXE` 设成 `DeepSeek Harness.exe` 的完整路径
-  （或者先自己启动一次 DSH——之后这个动作会找到运行实例的端口，一切正常）。受影响的只有
+  运行的实例、安装程序注册的 `dsh://` 协议处理命令、默认的 Electron 安装位置。协议注册项覆盖了
+  装在自定义目录里的情况；两者都没有的安装才需要设 `DSH_DESKTOP_APP_EXE`。受影响的只有
   「启动」这一步；只要有一个实例在跑，登记就照常工作。
 - **菜单图标是尽力而为的。** 决定图标的是同一个查找。一个都找不到时不写图标（删掉 `Icon` 值），
   菜单照常可用。
@@ -186,6 +186,20 @@ HKCU\Software\Classes\Directory\Background\shell\OpenInDeepSeekHarness
   `cli/context-menu.ps1` 里两个固定动作之一；宿主不是 Windows 时它直接回 `supported: false`，
   连 PowerShell 都不运行。这条路由由 DSH 设置页自己调用，因此不要求自定义请求头。
 - **除了 `127.0.0.1` 不访问网络。** 插件不下载任何东西，也不执行任何从 HTTP 传进来的内容。
+
+## 排查
+
+每次点击都会往 `%LOCALAPPDATA%\dsh-open-project\last-run.log` 追加一行，所以"点了像没反应"可以事后查清：
+
+```
+2026-10-19 15:53:50  ok; folder=D:\work\app; coldStart=False; exe=; endpoint=http://127.0.0.1:1583; created=False; title=app
+```
+
+`coldStart=True` 且 `exe=` 有值，说明这一次点击把应用启动起来了。行尾出现
+`no executable found` 表示找不到应用可执行文件，请设置 `DSH_DESKTOP_APP_EXE`。
+
+**完全没反应、连对话框都没有？** 这是 1.3.0 之前的 bug：失败对话框引用了
+`System.Windows.MessageBox` 却没有加载 WPF，抛异常后被空 catch 吞掉。更新后再试。
 
 ## 卸载
 

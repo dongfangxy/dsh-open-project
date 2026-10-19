@@ -26,8 +26,10 @@ a Windows notification:
 Bringing the window forward is part of the action on purpose: registering a project changes
 nothing on screen, so without it a click looks like it did nothing.
 
-If DSH is not running, the action starts it first and waits for it to come up before
-registering (see [Limitations](#limitations) for the cold-start caveat).
+If DSH is not running, the action starts it first: it locates the executable (`DSH_DESKTOP_APP_EXE`,
+then a running instance, then the `dsh://` handler the installer registers, then the default
+install locations), launches it, waits for the window and brings it forward, then registers the
+folder once the host answers. The whole wait is bounded (180 s).
 
 **In DSH.** Settings → General gains one row. In a Chinese browser it reads
 「用 DeepSeek Harness 打开」 with the description 「在文件夹的右键菜单里增加「用 DeepSeek
@@ -175,11 +177,11 @@ deletes both keys recursively.
 - **PowerShell is started once per action**, so the menu click and each settings toggle pay a
   process start-up (about 0.2 s with PowerShell 7, about 0.8 s with 5.1).
 - **Cold start needs the app executable to be discoverable.** `cli/app-path.ps1` checks
-  `DSH_DESKTOP_APP_EXE`, then a running instance, then the default Electron install locations.
-  A portable or unusually placed installation is found only while DSH is running; when it is
-  not, set `DSH_DESKTOP_APP_EXE` to the full path of `DeepSeek Harness.exe` (or start DSH
-  yourself once — the action then finds the running instance's port and works normally). Only
-  the *starting* step is affected; registering works with any running instance.
+  `DSH_DESKTOP_APP_EXE`, then a running instance, then the `dsh://` protocol handler the
+  installer registers, then the default Electron install locations. The protocol record covers
+  custom install directories; an installation that registers neither needs
+  `DSH_DESKTOP_APP_EXE`. Only the *starting* step is affected — registering works with any
+  running instance.
 - **The menu icon is best-effort.** The same lookup decides the icon. If it finds nothing, the
   entry is written without an icon (`Icon` is removed), and the menu still works.
 - **The screenshots date from DSH desktop 0.2.1-rc.2** (see [Effect](#effect)); the row's exact
@@ -217,6 +219,22 @@ deletes both keys recursively.
   called by the DSH settings page itself and therefore does not require the custom header.
 - **No network access beyond `127.0.0.1`.** The plugin downloads nothing and executes nothing
   that came in over HTTP.
+
+## Troubleshooting
+
+Every click writes one line to `%LOCALAPPDATA%\dsh-open-project\last-run.log`, so a click that
+seemed to do nothing can be explained afterwards:
+
+```
+2026-10-19 15:53:50  ok; folder=D:\work\app; coldStart=False; exe=; endpoint=http://127.0.0.1:1583; created=False; title=app
+```
+
+`coldStart=True` plus an `exe=` path means the app was started for that click. A line ending in
+`no executable found` means the app could not be located; set `DSH_DESKTOP_APP_EXE`.
+
+**Nothing happens at all, no dialog either?** That was a bug before 1.3.0: the failure dialogs
+referenced `System.Windows.MessageBox` without loading WPF, threw, and the error was swallowed.
+Re-run the action after updating.
 
 ## Uninstall
 

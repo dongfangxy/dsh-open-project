@@ -1,6 +1,6 @@
 {
   "name": "dsh-open-project",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "type": "module",
   "description": "Adds an Explorer folder context-menu entry that registers the folder as a DSH project, plus a switch for it in DSH general settings.",
   "keywords": [

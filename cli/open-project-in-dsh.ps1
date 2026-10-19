@@ -55,7 +55,21 @@ public static class DshWindowFocus {
 
 function Show-Balloon {
   param([string]$Message, [string]$Icon = 'Info')
-  try { [void][System.Windows.MessageBox]::Show($Message, 'DeepSeek Harness', 'OK', $Icon) } catch { }
+
+  # [System.Windows.MessageBox] is not resolvable until WPF is loaded, in both
+  # Windows PowerShell 5.1 and PowerShell 7. Referencing it without the Add-Type
+  # threw, and the empty catch turned every failure dialog into silence.
+  try {
+    Add-Type -AssemblyName PresentationFramework -ErrorAction Stop
+    [void][System.Windows.MessageBox]::Show($Message, 'DeepSeek Harness', 'OK', $Icon)
+    return
+  } catch { }
+
+  try {
+    Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
+    [void][System.Windows.Forms.MessageBox]::Show($Message, 'DeepSeek Harness', 'OK', [System.Windows.Forms.MessageBoxIcon]::Warning)
+    return
+  } catch { }
 }
 
 <#
@@ -133,21 +147,37 @@ function Test-DshRunning {
   return [bool](Get-Process -Name 'DeepSeek Harness' -ErrorAction SilentlyContinue)
 }
 
+# One line per run, appended, so a click that "did nothing" can be explained
+# afterwards instead of guessed at. The directory is per-user and needs no rights.
+$script:DshLogPath = Join-Path $env:LOCALAPPDATA 'dsh-open-project\last-run.log'
+
+function Write-DshLog {
+  param([string]$Message)
+  try {
+    $dir = Split-Path -Parent $script:DshLogPath
+    if (-not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+    $line = '{0}  {1}' -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $Message
+    Add-Content -LiteralPath $script:DshLogPath -Value $line -Encoding UTF8
+  } catch { }
+}
+
 # DSH_WEB_URL is injected into DSH sessions; a process started from the registry
-# does not have it, so fall back to the host process's listening port, then to
-# the desktop default. Loopback only.
-function Get-DshBaseUrl {
-  if ($env:DSH_WEB_URL -match '^http://127\.0\.0\.1:\d+$') { return $env:DSH_WEB_URL }
-  $candidates = @()
+# does not have it, so fall back to the host process's listening ports. Several
+# DeepSeek processes can listen on loopback, so return every candidate and let
+# the caller try each one: the route itself is the reliable test.
+function Get-DshBaseUrls {
+  $urls = @()
+  if ($env:DSH_WEB_URL -match '^http://127\.0\.0\.1:\d+$') { $urls += $env:DSH_WEB_URL }
   foreach ($proc in (Get-Process -Name 'DeepSeek Harness' -ErrorAction SilentlyContinue)) {
     foreach ($conn in (Get-NetTCPConnection -OwningProcess $proc.Id -State Listen -ErrorAction SilentlyContinue)) {
       if ($conn.LocalAddress -eq '127.0.0.1' -and $conn.LocalPort -gt 1024) {
-        $candidates += "http://127.0.0.1:$($conn.LocalPort)"
+        $urls += "http://127.0.0.1:$($conn.LocalPort)"
       }
     }
   }
-  if ($candidates.Count -gt 0) { return ($candidates | Select-Object -First 1) }
-  return $DefaultBase
+  $urls = @($urls | Select-Object -Unique)
+  if ($urls.Count -eq 0) { $urls = @($DefaultBase) }
+  return $urls
 }
 
 # --- 1) the target folder must really exist --------------------------------
@@ -164,9 +194,11 @@ if (-not (Test-Path -LiteralPath $resolved -PathType Container)) {
 
 # --- 2) start the app when it is not running -------------------------------
 $coldStart = -not (Test-DshRunning)
+$appExe = $null
 if ($coldStart) {
   $appExe = Find-DshAppExecutable
   if ($null -eq $appExe) {
+    Write-DshLog "no executable found; folder=$resolved"
     if (-not $Silent) {
       Show-Balloon ("DeepSeek Harness is not running and its executable was not found.`n`n" +
         "Set DSH_DESKTOP_APP_EXE to the full path of 'DeepSeek Harness.exe', then retry.") 'Warning'
@@ -175,6 +207,16 @@ if ($coldStart) {
   }
   Start-Process -FilePath $appExe | Out-Null
   Show-Toast 'Starting DeepSeek Harness' "Will open: $([System.IO.Path]::GetFileName($resolved))"
+
+  # Wait for the window itself first, so the app is visible while the host
+  # finishes starting, and its window is not left behind other windows.
+  $windowDeadline = (Get-Date).AddSeconds(30)
+  while ((Get-Date) -lt $windowDeadline) {
+    Start-Sleep -Milliseconds 700
+    $shown = Get-Process -Name 'DeepSeek Harness' -ErrorAction SilentlyContinue |
+      Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1
+    if ($shown) { Show-DshWindow; break }
+  }
 }
 
 # --- 3) ask the Host to register the project (wait, but not forever) -------
@@ -183,36 +225,50 @@ $deadline = (Get-Date).AddSeconds($waitSeconds)
 $body = @{ path = $resolved } | ConvertTo-Json -Compress
 $response = $null
 $lastDetail = ''
-$base = Get-DshBaseUrl
+$base = ''
+$basesTried = @()
 
 while ((Get-Date) -lt $deadline) {
-  $base = Get-DshBaseUrl
-  try {
-    $response = Invoke-RestMethod -Method Post -Uri "$base/.dsh-open-project" `
-      -Headers @{ 'x-dsh-open-project' = '1' } `
-      -ContentType 'application/json; charset=utf-8' `
-      -Body $body -TimeoutSec 12
-    break
-  } catch {
-    $status = $null
-    try { $status = [int]$_.Exception.Response.StatusCode } catch { }
-    $lastDetail = $_.Exception.Message
-    # 4xx other than 403 is terminal (bad path and so on); retrying is pointless.
-    if ($null -ne $status -and $status -ge 400 -and $status -lt 500 -and $status -ne 403) { break }
-    Start-Sleep -Milliseconds 1200
+  # Several DeepSeek processes may listen on loopback; try every candidate
+  # rather than trusting the first one, and let the route itself decide.
+  foreach ($candidate in (Get-DshBaseUrls)) {
+    $basesTried += $candidate
+    try {
+      $response = Invoke-RestMethod -Method Post -Uri "$candidate/.dsh-open-project" `
+        -Headers @{ 'x-dsh-open-project' = '1' } `
+        -ContentType 'application/json; charset=utf-8' `
+        -Body $body -TimeoutSec 12
+      $base = $candidate
+      break
+    } catch {
+      $status = $null
+      try { $status = [int]$_.Exception.Response.StatusCode } catch { }
+      $lastDetail = $_.Exception.Message
+      $base = $candidate
+      # Only the route's own validation errors are terminal: 400/422 mean the
+      # request itself is wrong. Everything else (connection refused while the
+      # app boots, 404 from a listener that is not the host) is worth retrying.
+      if ($null -ne $status -and ($status -eq 400 -or $status -eq 422)) { break }
+    }
   }
+  if ($null -ne $response) { break }
+  if ($lastDetail -and ($lastDetail -match 'Bad Request|Unprocessable')) { break }
+  Start-Sleep -Milliseconds 1200
 }
 
 if ($null -eq $response) {
+  Write-DshLog "failed; folder=$resolved; coldStart=$coldStart; lastEndpoint=$base; detail=$lastDetail"
   if (-not $Silent) {
     Show-Balloon (
       "Could not open this project.`n`nFolder: $resolved`nEndpoint: $base`nReason: $lastDetail`n`n" +
-      'If the app just started, wait for its window and try again.') 'Warning'
+      "If the app was just starting, give it a moment and try again.`n" +
+      "Log: $script:DshLogPath") 'Warning'
   }
   exit 1
 }
 
 if ($response.ok -ne $true) {
+  Write-DshLog "refused; folder=$resolved; error=$($response.error)"
   if (-not $Silent) { Show-Balloon "DSH refused the registration:`n$($response.error)" 'Warning' }
   exit 1
 }
@@ -221,6 +277,7 @@ if ($response.ok -ne $true) {
 # Focus first: the notification is easy to miss, and a registered project alone
 # leaves the screen unchanged, which reads as "the click did nothing".
 Show-DshWindow
+Write-DshLog "ok; folder=$resolved; coldStart=$coldStart; exe=$appExe; endpoint=$base; created=$($response.created); title=$($response.title)"
 Show-Toast $(if ($response.created) { 'Opened as a DSH project' } else { 'Already a DSH project' }) ([string]$response.title)
 
 exit 0
