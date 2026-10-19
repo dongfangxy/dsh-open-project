@@ -33,9 +33,71 @@ $WaitColdStartSeconds = 180
 
 # --- helpers ---------------------------------------------------------------
 
+# Win32 entry points for bringing the app forward. A background process is not
+# allowed to take the foreground on its own (Windows' foreground lock), so the
+# helper below attaches to the current foreground thread first.
+if (-not ('DshWindowFocus' -as [type])) {
+  Add-Type -ErrorAction Stop -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+public static class DshWindowFocus {
+  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+  [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int n);
+  [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr h);
+  [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
+  [DllImport("user32.dll")] public static extern bool AttachThreadInput(uint a, uint b, bool attach);
+  [DllImport("kernel32.dll")] public static extern uint GetCurrentThreadId();
+  [DllImport("user32.dll")] public static extern void keybd_event(byte vk, byte scan, uint flags, UIntPtr e);
+}
+'@
+}
+
 function Show-Balloon {
   param([string]$Message, [string]$Icon = 'Info')
   try { [void][System.Windows.MessageBox]::Show($Message, 'DeepSeek Harness', 'OK', $Icon) } catch { }
+}
+
+<#
+Bring the DeepSeek Harness window to the front, restoring it when minimized.
+
+Registering a project is invisible on its own: when the app is already running
+behind other windows, or hidden in the tray, nothing on screen changes and the
+click looks like it did nothing. This is what makes the action's result visible.
+
+@returns nothing; failures are swallowed because focus is best-effort.
+#>
+function Show-DshWindow {
+  try {
+    $proc = Get-Process -Name 'DeepSeek Harness' -ErrorAction SilentlyContinue |
+      Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1
+    if ($null -eq $proc) { return }
+
+    $handle = $proc.MainWindowHandle
+    if ([DshWindowFocus]::IsIconic($handle)) {
+      [void][DshWindowFocus]::ShowWindow($handle, 9)   # SW_RESTORE
+      Start-Sleep -Milliseconds 200
+    }
+    if ([DshWindowFocus]::GetForegroundWindow() -eq $handle) { return }
+
+    # Attaching to the foreground thread is what makes SetForegroundWindow
+    # honoured from a background process.
+    $foreground = [DshWindowFocus]::GetForegroundWindow()
+    $foregroundThread = [DshWindowFocus]::GetWindowThreadProcessId($foreground, [ref]([uint32]$null))
+    $ownThread = [DshWindowFocus]::GetCurrentThreadId()
+    [void][DshWindowFocus]::AttachThreadInput($ownThread, $foregroundThread, $true)
+    [void][DshWindowFocus]::SetForegroundWindow($handle)
+    [void][DshWindowFocus]::AttachThreadInput($ownThread, $foregroundThread, $false)
+    Start-Sleep -Milliseconds 250
+
+    if ([DshWindowFocus]::GetForegroundWindow() -ne $handle) {
+      # Fallback: an Alt keypress clears the foreground lock outright.
+      [DshWindowFocus]::keybd_event(0x12, 0x38, 0, [UIntPtr]::Zero)
+      [DshWindowFocus]::keybd_event(0x12, 0x38, 2, [UIntPtr]::Zero)
+      Start-Sleep -Milliseconds 100
+      [void][DshWindowFocus]::SetForegroundWindow($handle)
+    }
+  } catch { }
 }
 
 function Show-Toast {
@@ -155,7 +217,10 @@ if ($response.ok -ne $true) {
   exit 1
 }
 
-# --- 4) success feedback ---------------------------------------------------
+# --- 4) success: make it visible --------------------------------------------
+# Focus first: the notification is easy to miss, and a registered project alone
+# leaves the screen unchanged, which reads as "the click did nothing".
+Show-DshWindow
 Show-Toast $(if ($response.created) { 'Opened as a DSH project' } else { 'Already a DSH project' }) ([string]$response.title)
 
 exit 0

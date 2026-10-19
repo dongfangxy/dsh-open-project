@@ -15,12 +15,16 @@ It is a two-half DSH plugin:
 ## Effect
 
 **In Explorer.** Right-click a folder — or the empty area inside a folder — and the menu
-contains 「用 DeepSeek Harness 打开」. Choosing it adds that folder to DSH's project list and
-shows a Windows notification:
+contains 「用 DeepSeek Harness 打开」. Choosing it adds that folder to DSH's project list,
+**brings the DSH window to the front** (restoring it from the tray or from minimised), and shows
+a Windows notification:
 
 - `Opened as a DSH project` — the folder was registered (the notification's second line is the
   project title);
 - `Already a DSH project` — a project for that directory already existed, and nothing changed.
+
+Bringing the window forward is part of the action on purpose: registering a project changes
+nothing on screen, so without it a click looks like it did nothing.
 
 If DSH is not running, the action starts it first and waits for it to come up before
 registering (see [Limitations](#limitations) for the cold-start caveat).
