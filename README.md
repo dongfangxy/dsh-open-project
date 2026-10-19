@@ -1,5 +1,9 @@
 # dsh-open-project
 
+> **Current version: 1.4.0** — see [Changelog](#changelog). If you installed an earlier version,
+> update: 1.2.0 brings the DSH window to the front, and 1.3.x can start the app from a
+> non-default install directory and no longer fails silently.
+
 A DSH plugin for Windows: it adds **用 DeepSeek Harness 打开** ("Open in DeepSeek Harness")
 to the Explorer folder context menu, and registers the clicked folder as a project in DSH's
 sidebar. One switch in DSH's **Settings → General** adds or removes that menu entry.
@@ -31,14 +35,12 @@ then a running instance, then the `dsh://` handler the installer registers, then
 install locations), launches it, waits for the window and brings it forward, then registers the
 folder once the host answers. The whole wait is bounded (180 s).
 
-**In DSH.** Settings → General gains one row. In a Chinese browser it reads
-「用 DeepSeek Harness 打开」 with the description 「在文件夹的右键菜单里增加「用 DeepSeek
-Harness 打开」，点击后把该文件夹登记为 DSH 项目。只写当前用户的注册表，不需要管理员权限。」;
-in any other language it reads **Open in DeepSeek Harness** / "Adds an “Open in DeepSeek Harness”
-entry to a folder context menu. Selecting it registers the folder as a DSH project. Writes the
-current user's registry only; no administrator rights needed." The row sits between the existing
-code-workspace row and the version row. Its switch writes the registry entry when turned on and
-deletes it when turned off. On a non-Windows host the row is not rendered at all.
+**In DSH.** Settings → General gains one row — 「用 DeepSeek Harness 打开」 in a Chinese
+browser, **Open in DeepSeek Harness** otherwise. Its description says that the switch writes the
+current user's registry (no administrator rights), and reminds you to turn it off and on again
+after DSH moves, which re-registers the entry against the new path. The row sits between the
+code-workspace row and the version row. Turning the switch on writes both registry keys; turning
+it off deletes them. On a non-Windows host the row is not rendered at all.
 
 **Screenshots.** Windows 11, DSH desktop 0.2.1-rc.2.
 
@@ -281,6 +283,22 @@ React through the injected `require`. Both halves carry the same plugin name, an
 name, the host row id, and the client module id are kept identical on purpose.
 
 There is no build step: the files are shipped as they are, straight from the repository.
+
+## Changelog
+
+- **1.4.0** — The settings row now says what to do after DSH moves: turn the switch off and on
+  again to register the new location.
+- **1.3.1** — `status` reports a stale menu entry (`stale: true`) instead of the entry silently
+  doing nothing after the plugin is moved or reinstalled.
+- **1.3.0** — Finds the app through the `dsh://` protocol record, so a non-default install
+  directory works; failure dialogs actually appear; every loopback port is tried instead of just
+  the first; the window is focused while a cold start is still coming up; and every run appends a
+  line to `%LOCALAPPDATA%\dsh-open-project\last-run.log`.
+- **1.2.0** — Brings the DSH window to the front after registering, restoring it from the tray or
+  from minimised, so a click no longer looks like it did nothing.
+- **1.1.0** — Runs on Windows PowerShell 5.1, so PowerShell 7 is no longer a requirement; also
+  fixes the success toast, which never appeared under PowerShell 7.
+- **1.0.0** — First release.
 
 ## License
 

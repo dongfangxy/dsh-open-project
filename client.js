@@ -33,12 +33,12 @@ window.__ModuleLoader__.load({
     const TEXT = isChinese
       ? {
           title: '用 DeepSeek Harness 打开',
-          description: '在文件夹的右键菜单里增加「用 DeepSeek Harness 打开」，点击后把该文件夹登记为 DSH 项目。只写当前用户的注册表，不需要管理员权限。',
+          description: '在文件夹的右键菜单里增加「用 DeepSeek Harness 打开」，点击后把该文件夹登记为 DSH 项目；只写当前用户的注册表，不需要管理员权限。DSH 换了安装位置时，把开关关掉再打开一次，就会按新位置重新写入。',
           failed: '操作失败：'
         }
       : {
           title: 'Open in DeepSeek Harness',
-          description: 'Adds an “Open in DeepSeek Harness” entry to a folder context menu. Selecting it registers the folder as a DSH project. Writes the current user’s registry only; no administrator rights needed.',
+          description: 'Adds an “Open in DeepSeek Harness” entry to a folder context menu; selecting it registers the folder as a DSH project. Writes the current user’s registry only, no administrator rights. If DSH moves to another location, turn this off and on again to register the new path.',
           failed: 'Failed: '
         }
 
