@@ -232,6 +232,11 @@ seemed to do nothing can be explained afterwards:
 `coldStart=True` plus an `exe=` path means the app was started for that click. A line ending in
 `no executable found` means the app could not be located; set `DSH_DESKTOP_APP_EXE`.
 
+**Moved or reinstalled the plugin?** The menu entry stores an absolute path to this copy's
+launcher, written when you turned the switch on. If that copy moved, the entry stays in the menu
+and does nothing; status reports it via "stale": true (and a STALE line in the readable
+report). Toggle the switch off and on — or run -Action enable — to rewrite both keys against
+the new location.
 **Nothing happens at all, no dialog either?** That was a bug before 1.3.0: the failure dialogs
 referenced `System.Windows.MessageBox` without loading WPF, threw, and the error was swallowed.
 Re-run the action after updating.

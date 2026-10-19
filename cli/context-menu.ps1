@@ -46,15 +46,29 @@ function Get-Status {
   $present = @()
   foreach ($k in $keys) { if (Test-Path $k) { $present += $k } }
   $appExe = Find-DshAppExecutable
+
+  # The entry stores an absolute path to this copy's launcher, derived when it was
+  # written. If the plugin later moves (reinstall, different profile, another
+  # machine's path), the keys remain but point at a file that is gone: the menu
+  # item still appears and does nothing. Report that separately so it can be
+  # repaired by turning the switch off and on.
+  $registered = (Get-ItemProperty -Path "$($keys[0])\command" -ErrorAction SilentlyContinue).'(default)'
+  $registeredTarget = $null
+  if ($registered -match '"([^"]+\.vbs)"') { $registeredTarget = $Matches[1] }
+  $targetOk = ($null -ne $registeredTarget) -and (Test-Path -LiteralPath $registeredTarget)
+
   [pscustomobject]@{
-    Enabled = ($present.Count -eq $keys.Count)
-    Present = $present
-    Vbs     = $vbs
-    VbsOk   = (Test-Path -LiteralPath $vbs)
-    Ps1     = $ps1
-    Ps1Ok   = (Test-Path -LiteralPath $ps1)
-    Exe     = $appExe
-    ExeOk   = ($null -ne $appExe)
+    Enabled  = ($present.Count -eq $keys.Count)
+    Present  = $present
+    Vbs      = $vbs
+    VbsOk    = (Test-Path -LiteralPath $vbs)
+    Ps1      = $ps1
+    Ps1Ok    = (Test-Path -LiteralPath $ps1)
+    Exe      = $appExe
+    ExeOk    = ($null -ne $appExe)
+    Target   = $registeredTarget
+    TargetOk = $targetOk
+    Stale    = (($present.Count -eq $keys.Count) -and (-not $targetOk))
   }
 }
 
@@ -65,6 +79,8 @@ switch ($Action) {
       [pscustomobject]@{
         ok       = $true
         enabled  = [bool]$s.Enabled
+        stale    = [bool]$s.Stale
+        target   = $s.Target
         keys     = $s.Present
         appFound = [bool]$s.ExeOk
       } | ConvertTo-Json -Compress
@@ -72,9 +88,11 @@ switch ($Action) {
     }
     "Enabled       : $($s.Enabled)"
     "Registry keys : $($s.Present -join '; ')"
+    "Registered to : $(if ($s.Target) { "$($s.Target)  exists=$($s.TargetOk)" } else { 'not readable' })"
     "Hidden entry  : $($s.Vbs)  exists=$($s.VbsOk)"
     "Launcher      : $($s.Ps1)  exists=$($s.Ps1Ok)"
     "App executable: $(if ($s.ExeOk) { $s.Exe } else { 'not found (icon omitted; the app can still launch via DSH_DESKTOP_APP_EXE)' })"
+    if ($s.Stale) { 'STALE         : the registered launcher is missing; run -Action enable to repair' }
     break
   }
 

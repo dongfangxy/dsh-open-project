@@ -198,6 +198,9 @@ HKCU\Software\Classes\Directory\Background\shell\OpenInDeepSeekHarness
 `coldStart=True` 且 `exe=` 有值，说明这一次点击把应用启动起来了。行尾出现
 `no executable found` 表示找不到应用可执行文件，请设置 `DSH_DESKTOP_APP_EXE`。
 
+**插件换位置/重装过？** 菜单项里存的是「启用那一刻这份副本的启动器」的绝对路径。如果这份副本后来
+移动了，菜单项还在、但点了没反应；status 会给出 "stale": true（可读报告里是一行 STALE）。
+把设置开关关掉再打开，或者执行 -Action enable，就会按新位置重写两个注册表键。
 **完全没反应、连对话框都没有？** 这是 1.3.0 之前的 bug：失败对话框引用了
 `System.Windows.MessageBox` 却没有加载 WPF，抛异常后被空 catch 吞掉。更新后再试。
 
